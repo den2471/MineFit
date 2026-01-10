@@ -1,0 +1,5 @@
+https://modrinth.com/mod/create
+https://modrinth.com/mod/fabric-api
+https://modrinth.com/mod/xaeros-minimap
+https://modrinth.com/mod/modernfix
+https://modrinth.com/mod/not-enough-animations
