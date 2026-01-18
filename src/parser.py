@@ -6,7 +6,7 @@ from ver_repo import *
 import re
 from typing import TypeAlias
 from collections import defaultdict
-
+import questionary
 
 FlatProjects: TypeAlias = dict[
     str, dict[
@@ -30,11 +30,11 @@ class ProjectStack:
 
     def flat_projects(self, project_list: list[ProjectDantic]) -> FlatProjects:
         '''
-        Bulds projects index
+        Bulds projects index in the following format: loader -> project_id -> game_version -> (project_dantic, version_dantic)
 
         :param project_list: List of parsed projects
         :type project_list: list[ProjectDantic]
-        :return: Projects index in the following format: project_slug -> loader -> game_version -> (project_dantic, version_dantic)
+        :return: Projects index
         :rtype: FlatProjects
         '''
         index: FlatProjects = defaultdict(lambda: defaultdict(dict))
@@ -53,8 +53,6 @@ class ProjectStack:
             
         return freeze(index)
 
-project_stack = ProjectStack()
-
 class Modrinth:
 
     project_api_url = 'https://api.modrinth.com/v2/project/[id]'
@@ -72,36 +70,55 @@ class Modrinth:
                 json_responce = response.json()
                 json_responce['url'] = url
                 project = ProjectDantic.model_validate(json_responce)
-                cprint(f'Project {project.title}', end='\n')
+                cprint(f'{project.title}', end='\n')
+                cached, invalid = VerRepo.check_cached(project_id=project.id)
+                if cached:
+                    cprint(f'{cached} cached versions', end='\n', color=pcolor.success)
+                if invalid:
+                    cprint(f'{invalid} cached as invalid', end='\n', color=pcolor.error)
+
                 for version_id in project.versions:
-                    ver = VerRepo.get(version_id)
+                    ver = VerRepo.get(version_id, project.id)
                     if ver:
                         project.parsed_versions.append(ver)
 
-                if project.versions:
-                    if project.project_type == 'mod':
-                        project_stack.mods.append(project)
-                    if project.project_type == 'resourcepack':
-                        project_stack.resources.append(project)
-                    if project.project_type == 'shader':
-                        project_stack.shaders.append(project)
+                if project.parsed_versions:
+                    return project
+                else:
+                    cprint(f'Modrinth - All versions are invalid', color=pcolor.error, end='\n')
+                    return
                     
             except ValidationError:
                 cprint(f'Modrinth - Wrong api responce', color=pcolor.error, end='\n')
                 return
             except Exception as ex:
                 cprint(f'Modrinth - Exception\n{ex}', color=pcolor.error, end='\n')
+                return
         else:
             cprint(f'Invalid project url', color=pcolor.error, end='\n')
 
 
 if __name__ == '__main__':
     project_list = open('projects.txt', 'r').read().split('\n')
+    
+    project_stack = ProjectStack()
+    
     for project_url in project_list:
         project = Modrinth.parse_project(project_url)
+
+        if project:
+            if project.project_type == 'mod':
+                project_stack.mods.append(project)
+            if project.project_type == 'resourcepack':
+                project_stack.resources.append(project)
+            if project.project_type == 'shader':
+                project_stack.shaders.append(project)
+
+    if project_stack.shaders:
+        pass
 
     mods = project_stack.flat_projects(project_stack.mods)
     shaders = project_stack.flat_projects(project_stack.shaders)
     resources = project_stack.flat_projects(project_stack.resources)
 
-    print(mods.items())
+    

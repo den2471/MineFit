@@ -58,6 +58,10 @@ class InvalidVersionORM(BaseORM):
         primary_key=True,
     )
 
+    project_id: Mapped[str] = mapped_column(
+        String
+    )
+
 class ProjectDantic(BaseModel):
     url: str
     id: str

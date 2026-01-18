@@ -6,3 +6,12 @@ https://modrinth.com/mod/not-enough-animations
 https://modrinth.com/shader/complementary-reimagined
 https://modrinth.com/resourcepack/fresh-animations
 https://modrinth.com/resourcepack/dramatic-skys
+https://modrinth.com/shader/insanity-shader
+https://modrinth.com/shader/pastel-shaders
+https://modrinth.com/shader/bsl-shaders
+https://modrinth.com/shader/photon-shader
+https://modrinth.com/shader/solas-shader
+https://modrinth.com/shader/bliss-shader
+https://modrinth.com/shader/makeup-ultra-fast-shaders
+https://modrinth.com/shader/super-duper-vanilla
+https://modrinth.com/mod/iris
