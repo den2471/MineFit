@@ -60,6 +60,7 @@ class InvalidVersionORM(BaseORM):
 
 class ProjectDantic(BaseModel):
     url: str
+    id: str
     slug: str
     title: str
     description: str
@@ -70,6 +71,7 @@ class ProjectDantic(BaseModel):
     game_versions: list[str]
     loaders: list[str]
     versions: list[str]
+    parsed_versions: list['VersionDantic'] = []
     updated: str
 
 class VersionDantic(BaseModel):

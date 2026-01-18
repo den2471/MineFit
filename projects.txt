@@ -3,3 +3,6 @@ https://modrinth.com/mod/fabric-api
 https://modrinth.com/mod/xaeros-minimap
 https://modrinth.com/mod/modernfix
 https://modrinth.com/mod/not-enough-animations
+https://modrinth.com/shader/complementary-reimagined
+https://modrinth.com/resourcepack/fresh-animations
+https://modrinth.com/resourcepack/dramatic-skys

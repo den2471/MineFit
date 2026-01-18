@@ -47,14 +47,14 @@ class VerRepo:
     @classmethod
     def get(cls, slug: str) -> VersionDantic | None:
         statement = select(VersionORM).filter_by(id=slug)
-        chaced_ver = session.scalars(statement).one_or_none()
+        cached_ver = session.scalars(statement).one_or_none()
 
         statement = select(InvalidVersionORM).filter_by(id=slug)
         invalid_ver = session.scalars(statement).one_or_none()
 
-        if chaced_ver:
+        if cached_ver:
             cprint(f'Using cached ver {slug} ', end='\n', color=pcolor.success)
-            return chaced_ver
+            return cached_ver
         elif invalid_ver:
             cprint(f'{slug} cached as invalid', end='\n', color=pcolor.error)
             return None
