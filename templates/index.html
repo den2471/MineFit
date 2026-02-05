@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Packrinth</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <style>
+        .dropdown {
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            position: absolute;
+            background: white;
+            width: 300px;
+        }
+        .dropdown div {
+            padding: 5px;
+            cursor: pointer;
+        }
+        .dropdown div:hover {
+            background: #eee;
+        }
+    </style>
+</head>
+<body>
+
+<div style="position: relative;">
+    <input
+        id="search"
+        type="text"
+        placeholder="Введите название проекта на Modrinth"
+        autocomplete="off"
+        style="width: 300px;"
+    />
+    <div id="dropdown" class="dropdown"></div>
+</div>
+
+<br>
+
+<textarea
+    id="url_list"
+    placeholder="Вставьте ссылки на проекты Modrinth"
+></textarea>
+<script src="static/index.js" defer></script>
+</body>
+</html>

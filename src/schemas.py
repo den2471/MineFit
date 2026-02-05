@@ -1,8 +1,9 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, field_validator
 from typing import Optional
+import re
 
 BaseORM = declarative_base()
 
@@ -45,6 +46,10 @@ class VersionORM(BaseORM):
         String
     )
 
+    date_published: Mapped[str] = mapped_column(
+        String
+    )
+
     project_id: Mapped[str] = mapped_column(
         String
     )
@@ -63,7 +68,6 @@ class InvalidVersionORM(BaseORM):
     )
 
 class ProjectDantic(BaseModel):
-    url: str
     id: str
     slug: str
     title: str
@@ -75,8 +79,20 @@ class ProjectDantic(BaseModel):
     game_versions: list[str]
     loaders: list[str]
     versions: list[str]
-    parsed_versions: list['VersionDantic'] = []
+    parsed_versions: list[VersionORM] = []
+    invalid_versions: list[InvalidVersionORM] = []
     updated: str
+
+    model_config = {
+        "from_attributes": True
+    }
+
+class InvalidProjectDantic(BaseModel):
+    id: str
+
+    model_config = {
+        "from_attributes": True
+    }
 
 class VersionDantic(BaseModel):
     name: str
@@ -86,5 +102,39 @@ class VersionDantic(BaseModel):
     loaders: list[str]
     status: str
     id: str
+    date_published: str
     project_id: str
     
+    child: bool = False
+
+    model_config = {
+        "from_attributes": True
+    }
+    
+class InvalidVersionDantic(BaseModel):
+    id: str
+    project_id: str
+
+    model_config = {
+        "from_attributes": True,
+        'extra': 'ignore'
+    }
+
+class ProjectsList(BaseModel):
+    text: str
+
+    @field_validator('text')
+    def validate_links(cls, text: str):
+
+        SINGLE_URL = re.compile(f'https://modrinth.com/(shader|resourcepack|mod)/')
+
+        rows = text.splitlines()
+        
+        for row in rows:
+            matches = SINGLE_URL.findall(row)
+            if not row:
+                continue
+            if len(matches) > 1 or len(matches) < 1:
+                raise ValueError
+        
+        return text

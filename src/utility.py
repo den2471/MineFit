@@ -1,13 +1,17 @@
-import rich
+import logging
+import src.cfg as cfg
 
-def concatenate_endpoint(url: str, slug: str) -> str:
-    return url.replace('[id]', slug)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
 
-class pcolor:
-    default = "#FFFFFF"
-    success = "#68FF54"
-    error = "#FF6A6A"
-    disabled = "#646464"
+formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(message)s"
+)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
-def cprint(text: str, color: str = pcolor.default, end: str = ''):
-    rich.print(f'[{color}]{text}', end=end)
+def log(string: str, force: bool = False):
+    if cfg.DEBUG or force:
+        logger.info(string)
