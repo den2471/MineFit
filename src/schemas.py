@@ -63,10 +63,6 @@ class InvalidVersionORM(BaseORM):
         primary_key=True,
     )
 
-    project_id: Mapped[str] = mapped_column(
-        String
-    )
-
 class ProjectDantic(BaseModel):
     id: str
     slug: str
@@ -79,8 +75,8 @@ class ProjectDantic(BaseModel):
     game_versions: list[str]
     loaders: list[str]
     versions: list[str]
-    parsed_versions: list[VersionORM] = []
-    invalid_versions: list[InvalidVersionORM] = []
+    parsed_versions: list['VersionDantic'] = []
+    invalid_versions: list['InvalidVersionDantic'] = []
     updated: str
 
     model_config = {
@@ -105,15 +101,32 @@ class VersionDantic(BaseModel):
     date_published: str
     project_id: str
     
-    child: bool = False
-
     model_config = {
         "from_attributes": True
     }
+
+    @field_validator('dependencies', mode='before')
+    @classmethod
+    def deps_to_str(cls, data: list[dict] | list) -> list:
+
+        if not data:
+            return []
+        
+        if isinstance(data[0], str):
+            return data
+
+        result = []
+        for dep in data:
+            try:
+                result.append(dep['version_id'])
+            except KeyError:
+                pass
+        return result 
+
+
     
 class InvalidVersionDantic(BaseModel):
     id: str
-    project_id: str
 
     model_config = {
         "from_attributes": True,

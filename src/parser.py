@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 
 import src.cfg as cfg
-from src.schemas import ProjectDantic
+from src.schemas import ProjectDantic, InvalidProjectDantic
 from src.ver_repo import *
 from src.utility import *
 
@@ -19,7 +19,7 @@ class ModrinthProjectStack:
         self.shaders: list[ProjectDantic] = []
         self.resources: list[ProjectDantic] = []
 
-        self.versions_tree: dict[str, dict[str, list[str]]] = {}
+        self.versions_tree: dict[str, dict[str, set[str]]] = {}
 
     def _mods_to_tree(self) -> None:
         
@@ -33,9 +33,9 @@ class ModrinthProjectStack:
                     for game_ver in ver.game_versions:
                     
                         if game_ver not in self.versions_tree[loader]:
-                            self.versions_tree[loader][game_ver] = []
+                            self.versions_tree[loader][game_ver] = set()
 
-                        self.versions_tree[loader][game_ver].append(ver.id)
+                        self.versions_tree[loader][game_ver].update(ver.id)
 
     def _shaders_to_tree(self) -> None:
 
@@ -46,9 +46,9 @@ class ModrinthProjectStack:
                     for game_ver in ver.game_versions:
 
                         if game_ver not in self.versions_tree[loader]:
-                            self.versions_tree[loader][game_ver] = []
+                            self.versions_tree[loader][game_ver] = set()
 
-                        self.versions_tree[loader][game_ver].append(ver.id)
+                        self.versions_tree[loader][game_ver].update(ver.id)
 
     def _resources_to_tree(self) -> None:
 
@@ -59,11 +59,11 @@ class ModrinthProjectStack:
                     for game_ver in ver.game_versions:
 
                         if game_ver not in self.versions_tree[loader]:
-                            self.versions_tree[loader][game_ver] = []
+                            self.versions_tree[loader][game_ver] = set()
 
-                        self.versions_tree[loader][game_ver].append(ver.id)
+                        self.versions_tree[loader][game_ver].update(ver.id)
 
-    def make_ver_tree(self) -> dict[str, dict[str, list[str]]]:
+    def make_ver_tree(self) -> dict[str, dict[str, set[str]]]:
         
         """
         Bulds and returns versions tree in the following format: loader -> game_version -> list[versions_id]
@@ -94,6 +94,7 @@ class Modrinth:
             response.raise_for_status()
         except Exception as ex:
             log(str(ex), True)
+            raise ex
 
         return response.json()
         
@@ -111,7 +112,7 @@ class Modrinth:
 
         slug_list = [url.rsplit('/', 1)[1] for url in projects.split('\n')]
 
-        log(f'Parsing {len(slug_list)} projects')
+        log(f'{len(slug_list)} projects')
         
         projects_slugs_segmented = list(chunked(slug_list, cfg.COLLECTION_SEGMENT_SIZE))
 
@@ -155,9 +156,20 @@ class Modrinth:
         :param projects: Projects list
         :type projects: list[ProjectDantic]
         """
-        
+
+        version_ids_heap: set[str] = set()
+
         for proj in projects:
-            proj.parsed_versions, proj.invalid_versions = await VerRepo.get([ver for ver in proj.versions])
+            version_ids_heap.update(proj.versions)
+
+        parsed_heap: list[VersionDantic]
+        failed_heap: list[InvalidVersionDantic]
+
+        ver_stack = await VerRepo.get(version_ids_heap)
+
+        for proj in projects:
+            proj.parsed_versions = [ver for ver in list(ver_stack.parsed.values()) if ver.id in proj.versions]
+            proj.invalid_versions = [ver for ver in list(ver_stack.invalid.values()) if ver.id in proj.versions]
 
     @classmethod
     def _enrich_stack_with_projects(cls, stack: ModrinthProjectStack, projects: list[ProjectDantic]):
@@ -172,8 +184,6 @@ class Modrinth:
         """
 
         for project in projects:
-            log(f'')
-            log(f'Project: {project.title}')
             if project.project_type == 'mod':
                 stack.mods.append(project)
             if project.project_type == 'resourcepack':
@@ -182,7 +192,7 @@ class Modrinth:
                 stack.shaders.append(project)
 
     @classmethod
-    def final_check(cls, user_projects_count: int, parsed_projects_json: dict[str, dict[str, list[str]]], acceptable_fail_count: int = 0) -> dict[str, dict[str, list[str]]]:
+    def final_check(cls, user_projects_count: int, parsed_projects_json: dict[str, dict[str, set[str]]], acceptable_fail_count: int = 0) -> dict[str, dict[str, set[str]]]:
         
         """
         Iterate through every loader and game version combination in parsed projects and check if it has enough parsed versions.
@@ -209,7 +219,7 @@ class Modrinth:
         return parsed_projects_json
 
     @classmethod
-    async def parse_projects(cls, projects_urls: str) -> dict[str, dict[str, list[str]]]:
+    async def parse_projects(cls, projects_urls: str) -> dict[str, dict[str, set[str]]]:
         
         """
         Parsing given projects info, parsing projects versions, building projects stack and returning json string winth available modloaders and game versions

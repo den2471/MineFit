@@ -1,4 +1,5 @@
 https://modrinth.com/mod/create
+https://modrinth.com/mod/iris
 https://modrinth.com/mod/fabric-api
 https://modrinth.com/mod/xaeros-minimap
 https://modrinth.com/mod/modernfix
@@ -14,4 +15,3 @@ https://modrinth.com/shader/solas-shader
 https://modrinth.com/shader/bliss-shader
 https://modrinth.com/shader/makeup-ultra-fast-shaders
 https://modrinth.com/shader/super-duper-vanilla
-https://modrinth.com/mod/iris

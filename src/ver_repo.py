@@ -5,10 +5,12 @@ import json
 import src.cfg as cfg
 from copy import deepcopy
 from src.utility import *
-from src.db import Session, get_versions, save_versions, commit_changes
+from src.db import VerStack, Session
+import src.db as db
 from src.c_exceptions import *
 from src.schemas import *
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from more_itertools import chunked
 from pydantic import ValidationError
 
@@ -23,7 +25,7 @@ class VerRepo:
     async def _segment_request(cls, client: httpx.AsyncClient, version_list_segment: list[str]) -> list[dict]:
 
         """
-        Request data for versions segment from Modrinth
+        Request and returns versions data segment from Modrinth
         
         :param client: Client
         :type client: httpx.AsyncClient
@@ -32,6 +34,7 @@ class VerRepo:
         :return: Versions data if json
         :rtype: list[dict[Any, Any]]
         """
+
         
         ids_param = json.dumps(version_list_segment)
 
@@ -50,103 +53,184 @@ class VerRepo:
         return response
 
     @classmethod
-    def _versions_validate(cls, version: dict) -> VersionORM | InvalidVersionORM:
-
-        try:
-            model = VersionDantic.model_validate(version)
-            return VersionORM(**model.model_dump())
-        except ValidationError:
-            model = InvalidVersionDantic.model_validate(version)
-            return InvalidVersionORM(**model.model_dump())
+    async def _ver_stack_check(cls, ver_id_list: list[str], ver_stack: VerStack) -> list[str] | None:
         
-    @classmethod
-    async def _check_dependencies(cls, version: VersionORM) -> tuple[list[VersionORM], list[InvalidVersionORM]]:
+        """
+        Check versions from received list is already parsed and pushed into stack.
+        This method is for preventing infinite loop in case of mutual dependencies.
         
-        parsed: list[VersionORM] = []
-        invalid: list[InvalidVersionORM] = []
+        :param ver_id_list: List of versions ids
+        :type ver_id_list: list[str]
+        :param ver_stack: Global stack of versions
+        :type ver_stack: VerStack
+        """
 
-        for version in deepcopy(parsed):
-            _parsed, _invalid = await cls.get(version.dependencies)
-            if _invalid:
-                parsed.remove(version)
-                invalid.append(InvalidVersionORM(id=version.id))
-
-        return parsed, invalid
-
-    @classmethod
-    async def add(cls, version_id_list: list[str], working_with: set[str] | None = None) -> tuple[list[VersionORM], list[InvalidVersionORM]]:
-
-        log(f'Fetching {len(version_id_list)} versions')
-        
-        if working_with:
-            version_id_list = list(set(version_id_list) - set(working_with))
-        else:
-            working_with = set([ver for ver in version_id_list])
+        for ver_id in deepcopy(ver_id_list):
+            if ver_id in list(ver_stack.parsed.keys()) or ver_id in list(ver_stack.invalid.keys()):
+                ver_id_list.remove(ver_id)
             
-        segmented_list = chunked(version_id_list, cfg.COLLECTION_SEGMENT_SIZE)
+        return ver_id_list
 
-        async with httpx.AsyncClient(timeout=cls._timeout) as client:
-            results = await asyncio.gather(
-                *(cls._segment_request(client, segment) for segment in segmented_list)
-            )
-
-        parsed: list[VersionORM] = []
-        invalid: list[InvalidVersionORM] = []
+    @classmethod
+    async def _ver_stack_enrich(cls, results: list[list[dict]], ver_stack: VerStack):
+        
+        """
+        Validates segmented list of json responces from api and puts versions in global stack
+        
+        :param results: Versions segmented
+        :type results: list[list[dict]]
+        :param ver_stack: Global stack of versions
+        :type ver_stack: VerStack
+        :return: Description
+        :rtype: VerStack
+        """
 
         for segment in results:
             for ver in segment:
-                result = cls._versions_validate(ver)
-                if isinstance(result, VersionORM):
-                    parsed.append(result)
-                else:
-                    invalid.append(result)
+                try:
+                    model = VersionDantic.model_validate(ver)
+                    ver_stack.parsed[model.id] = model
+                except ValidationError as ex:
+                    model = InvalidVersionDantic.model_validate({'id': ver.get('id', 'null')})
+                    ver_stack.invalid[model.id] = model
+    
+    @classmethod
+    async def _versions_request(cls, ver_id_list: list[str]) -> list[list[dict]]:
+
+        """
+        Make async batch requests to api
         
-        for ver in parsed:
-            await cls._check_dependencies(ver)
+        :param ver_id_list_segmented: List if version ids
+        :type ver_id_list_segmented: list[list[str]]
+        :return: Segmented list of api responses
+        :rtype: list[list[dict]]
+        """
+        
+        ver_id_list_segmented = list(chunked(ver_id_list, cfg.COLLECTION_SEGMENT_SIZE))
 
-        await save_versions(parsed+invalid)
+        limits = httpx.Limits(
+            max_connections=cfg.MAX_CONCURRENT_REQUESTS,
+            max_keepalive_connections=cfg.KEEP_ALIVE_CONNECTION,
+        )
+        
+        async with httpx.AsyncClient(timeout=cls._timeout, limits=limits) as client:
+            results = await asyncio.gather(
+                *(cls._segment_request(client, segment) for segment in ver_id_list_segmented)
+            )
 
-        log(f'Cached {len(parsed)} parsed versions')
-        log(f'Cached {len(invalid)} invalid versions')
+        return results
+    
+    @classmethod
+    async def _dep_ids_aggregate(cls, ver_stack: VerStack) -> list[str]:
 
-        return parsed, invalid
+        """
+        Mutates gloabal versions stack.
+        If dependency has wrong data, parent versions moves from parsed to invalid. 
+        
+        :param ver_stack: Global versions stack
+        :type ver_stack: VerStack
+        :return: List of dependencies versions ids
+        :rtype: list[str]
+        """
+
+        dep_id_list: list[str] = []
+        ver_dantic_list = list(ver_stack.parsed.values())
+
+        for ver in ver_dantic_list:
+            dep_id_list.extend(ver.dependencies)
+
+        return dep_id_list
+    
+    @classmethod
+    async def _filter_invalid_vers_by_deps(cls, ver_stack: VerStack) -> None:
+        
+        """
+        Iterates through successfully validated versions and check if it has atleast one dependency that failed to validate.
+        if version has invalid dependency, then version moves from successfully validated list to invalid list.
+        
+        :param ver_stack: Global stack of processed versions
+        :type ver_stack: VerStack
+        """
+
+        parsed = deepcopy(ver_stack.parsed)
+        invalid = deepcopy(ver_stack.invalid)
+
+        for ver in parsed.values():
+            for dep in ver.dependencies:
+                if dep in list(invalid.keys()) or dep is None:
+                    del ver_stack.parsed[ver.id]
+                    ver_stack.invalid[ver.id] = InvalidVersionDantic.model_validate({'id': ver.id})
+                    break
+
+    @classmethod
+    async def add(cls, session: AsyncSession, ver_id_list: list[str], ver_stack: VerStack) -> VerStack:
+
+        """
+        Pipeline to request, validate and add project version to repo.
+        Check global versions stack -> request to api -> validate to pydantic models -> add models to stack -> check dependencies -> repeat from start -> return global versions stack
+        
+        :param ver_id_list: Description
+        :type ver_id_list: list[str]
+        :param ver_in_work: Description
+        :type ver_in_work: set[str] | None
+        :return: Description
+        :rtype: tuple[list[VersionDantic], dict[str, InvalidVersionDantic]]
+        """
+
+        
+        ver_id_list_filtered = await cls._ver_stack_check(ver_id_list, ver_stack)
+        
+        if not ver_id_list_filtered:
+            return ver_stack
+        
+        log(f'Fetching {len(ver_id_list_filtered)} versions')
+
+        request_response = await cls._versions_request(ver_id_list)
+
+        await cls._ver_stack_enrich(request_response, ver_stack)
+        
+        dep_id_list = list(set(await cls._dep_ids_aggregate(ver_stack)))
+
+        log(f'{len(dep_id_list)} dependencies')
+
+        await cls.add(session, dep_id_list, ver_stack)
+        
+        await cls._filter_invalid_vers_by_deps(ver_stack)
+
+        return ver_stack
         
     @classmethod
-    async def get(cls, version_list: list[str]) -> tuple[list[VersionORM], list[InvalidVersionORM]]:
+    async def get(cls, ver_id_list: set[str]) -> VerStack:
 
-        log(f'- Getting {len(version_list)} versions')
+        log(f'{len(ver_id_list)} versions')
 
-        ver_id_segmented = list(chunked(version_list, cfg.COLLECTION_SEGMENT_SIZE))
+        ver_id_segmented = list(chunked(ver_id_list, cfg.COLLECTION_SEGMENT_SIZE))
 
-        results = await asyncio.gather(
-            *(get_versions(segment) for segment in ver_id_segmented)
+        ver_stack = VerStack()
+
+        await asyncio.gather(
+            *(db.enrich_ver_stack(segment, ver_stack) for segment in ver_id_segmented)
         )
-
-        parsed_from_db: list[VersionORM] = []
-        invalid_from_db: list[InvalidVersionORM] = []
-
-        for segment in results:
-            parsed_from_db.extend(segment[0])
-            invalid_from_db.extend(segment[1])
         
-        log(f'- Got {len(parsed_from_db)} saved')
-        log(f'- Got {len(invalid_from_db)} invalid')
+        log(f'Got {len(ver_stack.parsed)} saved')
+        log(f'Got {len(ver_stack.invalid)} invalid')
 
-        for ver in parsed_from_db:
-            version_list.remove(ver.id)
+        for ver in list(ver_stack.parsed.values()):
+            ver_id_list.remove(ver.id)
 
-        for ver in invalid_from_db:
-            version_list.remove(ver.id)
+        for ver in list(ver_stack.invalid.values()):
+            ver_id_list.remove(ver.id)
 
-        remain = [id for id in version_list]
+        remain = list(ver_id_list)
 
-        log(f'- {len(remain)} missing in db')
+        log(f'{len(remain)} missing in db')
 
         if remain:
-            _parsed, _invalid = await cls.add(remain)
-            parsed_from_db.extend(_parsed)
-            invalid_from_db.extend(_invalid)
+            async with Session() as session:
+                await cls.add(session, remain, ver_stack)
+                session_data = list(ver_stack.parsed.values()) + list(ver_stack.invalid.values())
+                log(f'Cached {len(ver_stack.parsed)} parsed versions and {len(ver_stack.invalid)} invalid versions')
+                await db.add_versions_to_session(session, session_data)
+                await db.commit_changes(session)
 
-        await commit_changes()
-
-        return parsed_from_db, invalid_from_db
+        return ver_stack
