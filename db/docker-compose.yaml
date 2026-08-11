@@ -1,0 +1,16 @@
+services:
+  db:
+    build: .
+    container_name: db
+    ports:
+      - 5432:5432
+    environment:
+      - PG_ADMIN_PASS = ${PG_ADMIN_PASS}
+      - PG_WORKER_PASS = ${PG_WORKER_PASS}
+      - PG_REQUESTER_PASS = ${PG_REQUESTER_PASS}
+      - POSTGRES_DB = vault
+    volumes:
+      - pdata: /var/lib/postgresql/data
+
+volumes:
+  pdata:

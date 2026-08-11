@@ -1,0 +1,10 @@
+services:
+  cache:
+    image: redis:latest
+    container_name: local_cache
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy volatile-ttl
+      --requirepass ${REDIS_PASS}
+      --loglevel warning
