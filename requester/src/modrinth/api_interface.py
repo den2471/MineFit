@@ -30,7 +30,7 @@ async def _batch_request(id_list: list[list[str]], endpoint: str, client: httpx.
     return result
 
 async def _single_request(client: httpx.AsyncClient, endpoint: str, ids: list[str] | None = None) -> list[dict]:
-    await sleep(random.random() * 1) # jitter
+    await sleep(random.random() * 2) # jitter
     responce = await client.get(endpoint, params={'ids': json.dumps(ids)})
     responce.raise_for_status()
     return responce.json()

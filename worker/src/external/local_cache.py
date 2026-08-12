@@ -1,8 +1,9 @@
 from redis.asyncio import Redis
-from pydantic import ValidationError
+from typing import Any
 
 from src.util import settings
-from src.data.schemas import VersionDantic
+from src.data.schemas import VersionDantic, VerStack
+from src.data import validation
 
 redis = Redis(
     host=settings.LOCAL_CACHE_HOST,
@@ -11,19 +12,13 @@ redis = Redis(
     decode_responses=True
 )
 
-async def get_versions(id_list: set[str]) -> dict[str, VersionDantic]:
+async def get_versions(id_list: set[str]) -> VerStack:
     pipe = redis.pipeline()
     for id in id_list:
         pipe.getex(id, ex=settings.REDIS_TTL)
     raw_data = await pipe.execute()
-    result = {}
-    for obj in raw_data:
-        if isinstance(obj, dict):
-            try:
-                result[obj.get('id', 'null')] = VersionDantic.model_validate(obj)
-            except ValidationError:
-                pass
-    return result
+    verstack = validation.versions_from_cache(raw_data)
+    return verstack
 
 async def add_versions(versions: list[VersionDantic]):
     pipe = redis.pipeline()

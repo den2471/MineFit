@@ -5,6 +5,9 @@ from pydantic import BaseModel, field_validator
 
 import re
 
+class ProjectTree(BaseModel):
+    ...
+
 class ProjectDantic(BaseModel):
     id: str
     slug: str
@@ -14,11 +17,11 @@ class ProjectDantic(BaseModel):
     client_side: str
     server_side: str
     project_type: str
-    game_versions: list[str]
-    loaders: list[str]
-    versions: list[str]
-    parsed_versions: list['VersionDantic'] = []
-    invalid_versions: list['InvalidVersionDantic'] = []
+    game_versions: set[str]
+    loaders: set[str]
+    versions: set[str]
+    parsed_versions: dict[str, 'VersionDantic'] = {}
+    invalid_versions: set[str]
     updated: str
 
     model_config = {
@@ -35,13 +38,16 @@ class InvalidProjectDantic(BaseModel):
 class VersionDantic(BaseModel):
     id: str
     name: str
-    dependencies: list[str]
-    game_versions: list[str]
+    dependencies: set[str]
+    parsed_deps: dict[str, 'VersionDantic'] = {}
+    game_versions: set[str]
     version_type: str
-    loaders: list[str]
+    loaders: set[str]
     status: str
     date_published: str
     project_id: str
+
+    completely_processed = False
     
     model_config = {
         "from_attributes": True
@@ -64,19 +70,18 @@ class VersionDantic(BaseModel):
             except KeyError:
                 pass
         return result 
-    
-class InvalidVersionDantic(BaseModel):
-    id: str
 
-    model_config = {
-        "from_attributes": True,
-        'extra': 'ignore'
-    }
+class VerStack(BaseModel):
+    valid: dict[str, VersionDantic] = {}
+    invalid: set[str] = set()
 
-class VerStack:
-    def __init__(self) -> None:
-        self.parsed: dict[str, VersionDantic] = {}
-        self.invalid: dict[str,InvalidVersionDantic] = {}
+    def merge(self, verstack: 'VerStack'):
+        self.valid.update(verstack.valid)
+        self.invalid.update(verstack.invalid)
+
+class ProjStack(BaseModel):
+    valid: dict[str, ProjectDantic] = {}
+    invalid: set[str] = set()
 
 BaseORM = declarative_base()
 
@@ -134,10 +139,6 @@ class InvalidVersionORM(BaseORM):
     id: Mapped[str] = mapped_column(
         String,
         primary_key=True,
-    )
-
-    project_id: Mapped[str] = mapped_column(
-        String
     )
 
 SINGLE_URL = re.compile(r'^https://modrinth\.com/(shader|resourcepack|mod)/[\w-]+$')

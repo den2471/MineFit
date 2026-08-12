@@ -13,6 +13,5 @@ CREATE TABLE IF NOT EXISTS versions (
 );
 
 CREATE TABLE IF NOT EXISTS invalid_versions (
-    id text PRIMARY KEY,
-    project_id text
+    id text PRIMARY KEY
 );

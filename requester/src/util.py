@@ -1,6 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from fastapi import Request, HTTPException, status
-from httpx import AsyncClient, Limits
 from more_itertools import chunked
 from typing import Any
 
