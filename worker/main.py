@@ -1,7 +1,7 @@
 from re import compile
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
-from pipeline import main_pipeline
+from projects_handling import main_pipeline
 
 class ProjectsIds(BaseModel):
     ids: set[str]
