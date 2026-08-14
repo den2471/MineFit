@@ -1,17 +1,16 @@
+from collections import deque, defaultdict
+
 import pull_from as pull_from
-from src.data.schemas import VerStack, VersionDantic
-from src.util import _clean_id_list
+from src.data.schemas import VerStack
 
 async def main_pipeline(verstack: VerStack) -> VerStack:
 
-    actual_versions_ids: set[str] = set(verstack.valid.keys())
-    dep_list = _update_dep_list(set(), verstack)
+    to_collect_deps = set(verstack.valid)
 
-    while dep_list:
+    while to_collect_deps:
 
-        dep_list = _update_dep_list(dep_list, verstack)
-        dep_list = _clean_id_list(dep_list, verstack)
-
+        dep_list = _get_missing_dependencies(to_collect_deps, verstack)
+        
         if dep_list:
 
             verstack, remain = await pull_from.local_cache(dep_list, verstack)
@@ -21,50 +20,59 @@ async def main_pipeline(verstack: VerStack) -> VerStack:
         
             if remain:
                 verstack = await pull_from.api(remain, verstack)
+        else:
+            break
 
-    verstack = _enrich_versions_with_deps(verstack, actual_versions_ids)
+        to_collect_deps = verstack.valid.keys() - dep_list
+
+    verstack = _discard_invalid(verstack)
+    verstack = _enrich_versions_with_deps(verstack)
     return verstack
 
-def _enrich_versions_with_deps(verstack: VerStack, actual_versions_ids: set[str]) -> VerStack:
+def _get_missing_dependencies(ver_id_list: set[str], verstack: VerStack) -> set[str]:
+    resolved = verstack.valid.keys() | verstack.invalid
+    missing_deps = set()
 
-    to_inspect: dict[str, VersionDantic] = {}
-    for ver_id in actual_versions_ids:
-        to_inspect[ver_id] = verstack.valid[ver_id]
+    for ver_id in ver_id_list:
+        if ver := verstack.valid.get(ver_id):
+            for dep_id in ver.dependencies:
+                if dep_id not in resolved:
+                    missing_deps.add(dep_id)
+    return missing_deps
 
-    for version in to_inspect.values():
-        if not _deep_inspection(version, verstack):
-            verstack.valid.pop(version.id, None)
-            verstack.invalid.add(version.id)
+def _discard_invalid(verstack: VerStack) -> VerStack:
+
+    dependendants_map: dict[str, set[str]] = defaultdict(set)
+    to_delete = deque()
+    hashed_to_delete = set()
+
+    for ver_id, ver in verstack.valid.items():
+        for dep_id in ver.dependencies:
+            dependendants_map[dep_id].add(ver_id)
+            if dep_id not in verstack.valid and ver_id not in hashed_to_delete:
+                to_delete.append(ver_id)
+                hashed_to_delete.add(ver_id)
+
+    while to_delete:
+
+        ver_id = to_delete.popleft()
+        hashed_to_delete.remove(ver_id)
+
+        if ver_id in verstack.valid:
+            verstack.valid.pop(ver_id)
+            verstack.invalid.add(ver_id)
+
+            for parent_id in dependendants_map[ver_id]:
+                if parent_id in verstack.valid and parent_id not in hashed_to_delete:
+                    to_delete.append(parent_id)
+                    hashed_to_delete.add(parent_id)
+
     return verstack
 
-def _deep_inspection(version: VersionDantic, verstack: VerStack, skip: set[str] | None = None) -> bool:
+def _enrich_versions_with_deps(verstack: VerStack) -> VerStack:
 
-    if skip is None:
-        skip = set()
-
-    for dep_id in version.dependencies:
-
-        if dep_id in skip:
-            continue
-
-        if dep_id in verstack.invalid:
-            return False
-
-        if dep_id in version.parsed_deps.keys():
-            continue
-
-        try:
-            dependency = verstack.valid[dep_id]
-            version.parsed_deps[dep_id] = dependency
-            if dependency.dependencies:
-                if not _deep_inspection(dependency, verstack, skip):
-                    return False
-        except KeyError:
-            return False
-        skip.add(dep_id)
-    return True
-
-def _update_dep_list(dep_list: set[str], verstack: VerStack) -> set[str]:
     for ver in verstack.valid.values():
-        dep_list.update(ver.dependencies)
-    return dep_list
+        for dep_id in ver.dependencies:
+            ver.parsed_deps[dep_id] = verstack.valid[dep_id]
+
+    return verstack

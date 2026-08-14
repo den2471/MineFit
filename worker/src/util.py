@@ -18,10 +18,6 @@ logger.addHandler(handler)
 def log(string: str, force: bool = False):
     if settings.DEBUG or force:
         logger.info(string)
-
-def _clean_id_list(id_list: set[str], verstack: VerStack):
-    resolved = verstack.valid.keys() | verstack.invalid
-    return id_list - resolved
         
 class Settings(BaseSettings):
 

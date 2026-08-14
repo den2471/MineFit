@@ -7,6 +7,7 @@ import pull_from as pull_from
 async def main_pipeline(id_list: set[str]) -> ProjectTree:
     tree = ProjectTree()
     projstack = await _projetcs_processing(set(id_list))
+    tree = _tree_building(projstack)
     return tree
 
 async def _projetcs_processing(id_list: set[str]) -> ProjStack:
@@ -45,5 +46,5 @@ def _enrich_projects_with_versions(projstack: ProjStack, verstack: VerStack) -> 
                 project.invalid_versions.add(ver)
     return projstack
 
-def _tree_building(projects: dict[str, ProjectDantic]):
+def _tree_building(projstack: ProjStack) -> ProjectTree:
     ...

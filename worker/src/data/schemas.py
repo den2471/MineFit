@@ -46,8 +46,6 @@ class VersionDantic(BaseModel):
     status: str
     date_published: str
     project_id: str
-
-    completely_processed = False
     
     model_config = {
         "from_attributes": True
