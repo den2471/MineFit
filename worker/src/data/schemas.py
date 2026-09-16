@@ -5,9 +5,6 @@ from pydantic import BaseModel, field_validator
 
 import re
 
-class ProjectTree(BaseModel):
-    ...
-
 class ProjectDantic(BaseModel):
     id: str
     slug: str
@@ -20,9 +17,10 @@ class ProjectDantic(BaseModel):
     game_versions: set[str]
     loaders: set[str]
     versions: set[str]
-    parsed_versions: dict[str, 'VersionDantic'] = {}
     invalid_versions: set[str]
     updated: str
+
+    tree: dict[str, 'Loader']
 
     model_config = {
         "from_attributes": True
@@ -46,6 +44,7 @@ class VersionDantic(BaseModel):
     status: str
     date_published: str
     project_id: str
+    files: list[dict]
     
     model_config = {
         "from_attributes": True
@@ -80,6 +79,14 @@ class VerStack(BaseModel):
 class ProjStack(BaseModel):
     valid: dict[str, ProjectDantic] = {}
     invalid: set[str] = set()
+
+class GameVersion(BaseModel):
+    name: str
+    versions: dict[str, VersionDantic] = {}
+
+class Loader(BaseModel):
+    name: str                                 
+    game_versions: dict[str, GameVersion] = {}
 
 BaseORM = declarative_base()
 

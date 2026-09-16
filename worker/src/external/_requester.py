@@ -10,14 +10,14 @@ client = httpx.AsyncClient(limits=limiter)
 
 async def get_projects(id_list: set[str]) -> ProjStack:
     host: str = settings.REQUESTER_HOST + '/projects'
-    raw_responce = await _send_request(id_list, host)
-    projstack = validation.projects_from_api(raw_responce)
+    raw_response = await _send_request(id_list, host)
+    projstack = validation.projects_from_api(raw_response)
     return projstack
 
 async def get_versions(id_list: set[str]) -> VerStack:
     host: str = settings.REQUESTER_HOST + '/versions'
-    raw_responce = await _send_request(id_list, host)
-    verstack = validation.versions_from_api(raw_responce)
+    raw_response = await _send_request(id_list, host)
+    verstack = validation.versions_from_api(raw_response)
     return verstack
 
 async def _send_request(id_list: set[str], endpoint: str) -> list[dict]:

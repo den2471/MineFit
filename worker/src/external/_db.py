@@ -19,7 +19,7 @@ async def get_versions(id_list: set[str]) -> VerStack:
         for ver in versions:
             verstack.valid[ver.id] = VersionDantic.model_validate(ver)
         for inv_ver in inv_versions:
-            verstack.invalid.update(inv_ver)
+            verstack.invalid.update(inv_ver.id)
     return verstack
 
 async def push_versions(data: list[VersionORM | InvalidVersionORM]) :

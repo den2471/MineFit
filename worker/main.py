@@ -22,5 +22,5 @@ app = FastAPI()
 
 @app.post('/game_versions')
 async def calculate_versions(id_list: ProjectsIds):
-    tree = await main_pipeline(id_list.ids)
+    respond = await main_pipeline(id_list.ids)
     return

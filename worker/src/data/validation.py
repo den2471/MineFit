@@ -21,7 +21,7 @@ def versions_from_cache(raw_data: list[Any]) -> VerStack:
     for row in raw_data:
         if isinstance(row, dict):
             try:
-                model = VersionDantic.model_validate(raw_data)
+                model = VersionDantic.model_validate(row)
                 verstack.valid[model.id] = model
             except ValidationError:
                 try:

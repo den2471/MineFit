@@ -23,10 +23,10 @@ async def main_pipeline(verstack: VerStack) -> VerStack:
         else:
             break
 
-        to_collect_deps = verstack.valid.keys() - dep_list
+        to_collect_deps = dep_list
 
-    verstack = _discard_invalid(verstack)
     verstack = _enrich_versions_with_deps(verstack)
+    verstack = _discard_invalid(verstack)
     return verstack
 
 def _get_missing_dependencies(ver_id_list: set[str], verstack: VerStack) -> set[str]:

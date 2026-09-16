@@ -11,7 +11,7 @@ class InvalidProject(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
-class InvalidApiResponce(Exception):
+class InvalidApiResponse(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
@@ -19,6 +19,6 @@ class ServiceNotFound(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
-class NoEnvVariabre(Exception):
+class NoEnvVariable(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
