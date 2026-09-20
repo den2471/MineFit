@@ -1,11 +1,11 @@
-from re import compile
+from re import compile, Pattern
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
-from projects_handling import main_pipeline
+from src.projects_handling import main_pipeline
 
 class ProjectsIds(BaseModel):
     ids: set[str]
-    ID_SLUG = compile(r"^[A-Za-z0-9_.-]{3,64}$")
+    ID_SLUG: Pattern = compile(r"^[A-Za-z0-9_.-]{3,64}$")
     @field_validator('ids')
     @classmethod
     def validate_ids(cls, ids: set[str]) -> set[str]:

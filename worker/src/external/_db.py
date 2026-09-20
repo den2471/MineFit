@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import select
 
 from src.data.schemas import VersionORM, InvalidVersionORM, VerStack, VersionDantic
-from util import settings
+from src.util import settings
 
 engine = create_async_engine(f'postgresql+asyncpg://worker:{settings.DB_PASS}@{settings.DB_HOST}:5432/vault', echo=False)
 Session = async_sessionmaker(engine)
@@ -19,7 +19,7 @@ async def get_versions(id_list: set[str]) -> VerStack:
         for ver in versions:
             verstack.valid[ver.id] = VersionDantic.model_validate(ver)
         for inv_ver in inv_versions:
-            verstack.invalid.update(inv_ver.id)
+            verstack.invalid.add(inv_ver.id)
     return verstack
 
 async def push_versions(data: list[VersionORM | InvalidVersionORM]) :

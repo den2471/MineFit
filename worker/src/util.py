@@ -18,9 +18,14 @@ logger.addHandler(handler)
 def log(string: str, force: bool = False):
     if settings.DEBUG or force:
         logger.info(string)
+
+def _clean_id_list(list_to_clean: set[str], verstack: VerStack):
+    for id in verstack.valid.keys() | verstack.invalid:
+        list_to_clean.discard(id)
+    return list_to_clean
         
 class Settings(BaseSettings):
-
+    
     LOCAL_CACHE_HOST: str = 'orc.local_cache'
     LOCAL_CACHE_PORT: int = 6379
     DB_HOST: str = 'orc.db'
@@ -32,7 +37,7 @@ class Settings(BaseSettings):
 
     REDIS_TTL: int = 900
 
-    DEBUG = False
+    DEBUG: bool = False
 
     model_config = SettingsConfigDict(
         env_file="src/.env",

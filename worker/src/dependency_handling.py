@@ -1,9 +1,9 @@
 from collections import deque, defaultdict
 
-import pull_from as pull_from
+import src.pull_from as pull_from
 from src.data.schemas import VerStack
 
-async def main_pipeline(verstack: VerStack) -> VerStack:
+async def main_pipeline(verstack: VerStack, pull_from = pull_from) -> VerStack:
 
     to_collect_deps = set(verstack.valid)
 

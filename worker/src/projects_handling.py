@@ -1,8 +1,8 @@
 import src.dependency_handling as dependency_handling
 
-from external import _requester
+from src.external import _requester
 from src.data.schemas import ProjectDantic, VerStack, ProjStack, VersionDantic, Loader, GameVersion
-import pull_from as pull_from
+import src.pull_from as pull_from
 
 async def main_pipeline(id_list: set[str]) -> ProjStack:
     projstack = await _requester.get_projects(id_list)
@@ -10,7 +10,7 @@ async def main_pipeline(id_list: set[str]) -> ProjStack:
     projstack = _build_tree(projstack, verstack)
     return projstack
 
-async def _versions_processing(projects: dict[str, ProjectDantic]) -> VerStack:
+async def _versions_processing(projects: dict[str, ProjectDantic], pull_from = pull_from) -> VerStack:
 
     id_list: set[str] = set()
 

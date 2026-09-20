@@ -1,6 +1,6 @@
-from external import _db, _local_cache
+from src.external import _db, _local_cache
 from src.data.schemas import VerStack, InvalidVersionORM
-from external import _requester
+from src.external import _requester
 from src.util import _clean_id_list
 
 async def local_cache(id_list: set[str], main_verstack: VerStack) -> tuple[VerStack, set[str]]:

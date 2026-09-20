@@ -1,5 +1,4 @@
 from redis.asyncio import Redis
-from typing import Any
 
 from src.util import settings
 from src.data.schemas import VersionDantic, VerStack

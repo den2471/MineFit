@@ -4,7 +4,7 @@ services:
     container_name: local_cache
     command: >
       redis-server
-      --maxmemory 512mb
+      --maxmemory 1024mb
       --maxmemory-policy volatile-ttl
       --requirepass ${REDIS_PASS}
       --loglevel warning
